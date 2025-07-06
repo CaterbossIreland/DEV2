@@ -45,6 +45,16 @@ def download_excel_file(file_id):
     r = requests.get(url, headers=headers)
     r.raise_for_status()
     return pd.read_excel(BytesIO(r.content))
+    
+def download_excel_file(file_id):
+    token = get_graph_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    url = f"https://graph.microsoft.com/v1.0/drives/{DRIVE_ID}/items/{file_id}/content"
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    df = pd.read_excel(BytesIO(r.content))
+    print("DEBUG: Columns in downloaded file:", list(df.columns))
+    return df
 
 def download_supplier_csv():
     token = get_graph_access_token()
