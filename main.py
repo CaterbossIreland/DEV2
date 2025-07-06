@@ -143,6 +143,10 @@ async def login(request: Request, password: str = Form(...)):
             "<h3>Invalid password. <a href='/'>Try again</a>.</h3>",
             status_code=401,
         )
+@app.post("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/", status_code=303)
 
 
 @app.post("/upload_orders/display")
