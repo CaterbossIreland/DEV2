@@ -133,6 +133,16 @@ async def main_upload_form(request: Request):
         </div>
         <div class="footer">Caterboss Orders &copy; 2025</div>
         """
+@app.post("/login")
+async def login(request: Request, password: str = Form(...)):
+    if password == "Admin123":
+        request.session["admin_logged_in"] = True
+        return RedirectResponse("/", status_code=303)
+    else:
+        return HTMLResponse(
+            "<h3>Invalid password. <a href='/'>Try again</a>.</h3>",
+            status_code=401,
+        )
 
 
 @app.post("/upload_orders/display")
