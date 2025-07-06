@@ -3,7 +3,9 @@ import requests
 import pandas as pd
 from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from io import BytesIO, StringIO
+from starlette.middleware.sessions import SessionMiddleware
 
 TENANT_ID = os.getenv("TENANT_ID", "ce280aae-ee92-41fe-ab60-66b37ebc97dd")
 CLIENT_ID = os.getenv("CLIENT_ID", "83acd574-ab02-4cfe-b28c-e38c733d9a52")
@@ -12,14 +14,11 @@ DRIVE_ID = os.getenv("DRIVE_ID", "b!udRZ7OsrmU61CSAYEn--q1fPtuPR3TZAsv2B9cCW-gzW
 SUPPLIER_FILE_ID = os.getenv("SUPPLIER_FILE_ID", "01YTGSV5DGZEMEISWEYVDJRULO4ADDVCVQ")
 NISBETS_STOCK_FILE_ID = os.getenv("NISBETS_STOCK_FILE_ID", "01YTGSV5GERF436HITURGITCR3M7XMYJHF")
 NORTONS_STOCK_FILE_ID = os.getenv("NORTONS_STOCK_FILE_ID", "01YTGSV5FKHUI4S6BVWJDLNWETK4TUU26D")
-
-
 ZOHO_TEMPLATE_PATH = "column format.xlsx"
 DPD_TEMPLATE_PATH = "DPD.Import(1).csv"   # Use the correct file!
 
 app = FastAPI()
-from starlette.middleware.sessions import SessionMiddleware
-app.add_middleware(SessionMiddleware, secret_key="!supersecret!")  # Put any secret key here
+app.add_middleware(SessionMiddleware, secret_key="!supersecret!")
 
 latest_nisbets_csv = None
 latest_zoho_xlsx = None
@@ -38,14 +37,6 @@ def get_graph_access_token():
     r.raise_for_status()
     return r.json()['access_token']
 
-def download_excel_file(file_id):
-    token = get_graph_access_token()
-    headers = {"Authorization": f"Bearer {token}"}
-    url = f"https://graph.microsoft.com/v1.0/drives/{DRIVE_ID}/items/{file_id}/content"
-    r = requests.get(url, headers=headers)
-    r.raise_for_status()
-    return pd.read_excel(BytesIO(r.content))
-    
 def download_excel_file(file_id):
     token = get_graph_access_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -78,7 +69,6 @@ def upload_excel_file(file_id, df):
     r.raise_for_status()
 
 def get_dpd_template_columns(template_path):
-    # Check delimiter in file
     with open(template_path, "r", encoding="utf-8") as f:
         sample = f.read(2048)
     delimiter = "," if sample.count(",") > sample.count(";") else ";"
@@ -125,40 +115,55 @@ async def main_upload_form(request: Request):
     </script>
     """
 
-    else:
-        # Show login form
-        return """
-        <style>
-        body { font-family: 'Segoe UI',Arial,sans-serif; background: #f3f6f9; }
-        .container { max-width: 420px; margin: 5em auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #0001; padding: 2.5em;}
-        input,button {font-size:1.1em;padding:0.5em;margin:0.3em 0;width:100%;}
-        button { background: #3b82f6; color: #fff; border: none; border-radius: 6px;}
-        .footer { margin-top: 2em; text-align: center; color: #888;}
-        </style>
-        <div class="container">
-          <h2>Admin Login</h2>
-          <form action="/login" method="post">
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-          </form>
-        </div>
-        <div class="footer">Caterboss Orders &copy; 2025</div>
-        """
+@app.get("/admin-login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    return """
+    <style>
+    body { font-family: 'Segoe UI',Arial,sans-serif; background: #f3f6f9; }
+    .container { max-width: 420px; margin: 5em auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #0001; padding: 2.5em;}
+    input,button {font-size:1.1em;padding:0.5em;margin:0.3em 0;width:100%;}
+    button { background: #3b82f6; color: #fff; border: none; border-radius: 6px;}
+    .footer { margin-top: 2em; text-align: center; color: #888;}
+    </style>
+    <div class="container">
+      <h2>Admin Login</h2>
+      <form action="/login" method="post">
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+    </div>
+    <div class="footer">Caterboss Orders &copy; 2025</div>
+    """
+
 @app.post("/login")
 async def login(request: Request, password: str = Form(...)):
     if password == "Admin123":
         request.session["admin_logged_in"] = True
-        return RedirectResponse("/", status_code=303)
+        return RedirectResponse("/admin", status_code=303)
     else:
         return HTMLResponse(
-            "<h3>Invalid password. <a href='/'>Try again</a>.</h3>",
+            "<h3>Invalid password. <a href='/admin-login'>Try again</a>.</h3>",
             status_code=401,
         )
+
 @app.post("/logout")
 async def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/", status_code=303)
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    if not request.session.get("admin_logged_in"):
+        return RedirectResponse("/admin-login")
+    return """
+    <div style='padding:3em;max-width:600px;margin:4em auto;background:#fff;border-radius:12px;box-shadow:0 2px 16px #0001'>
+        <form action="/logout" method="post" style="text-align:right;">
+            <button type="submit" style="background:#e53e3e;">Logout</button>
+        </form>
+        <h2>Admin Area</h2>
+        <p>Put admin features here...</p>
+    </div>
+    """
 
 @app.post("/upload_orders/display")
 async def upload_orders_display(file: UploadFile = File(...)):
@@ -257,7 +262,6 @@ async def upload_orders_display(file: UploadFile = File(...)):
         return HTMLResponse(f"<b>Failed to load Zoho template: {e}</b>", status_code=500)
 
     zoho_df = df.copy()
-    # Add your fields and set default values
     if 'Date created' in zoho_df.columns:
         zoho_df['Date created'] = zoho_df['Date created'].astype(str).str.split().str[0]
     zoho_df['Shipping total amount'] = 4.95
@@ -278,12 +282,9 @@ async def upload_orders_display(file: UploadFile = File(...)):
         zoho_df['Invoice Number'] = zoho_df['Order number']
         zoho_df['Subject'] = zoho_df['Order number']
     zoho_df['Payment Terms'] = 'Musgrave'
-
-    # Ensure all template columns exist (fill missing with blank)
     for col in zoho_col_order:
         if col not in zoho_df.columns:
             zoho_df[col] = ""
-    # Now set DataFrame to exact template column order
     zoho_df = zoho_df[zoho_col_order]
     buffer = BytesIO()
     zoho_df.to_excel(buffer, index=False)
@@ -291,7 +292,6 @@ async def upload_orders_display(file: UploadFile = File(...)):
     latest_zoho_xlsx = buffer.getvalue()
     zoho_download_link = "<a href='/download_zoho_xlsx' download='zoho_orders.xlsx'><button class='copy-btn' style='background:#0f9d58;right:auto;top:auto;position:relative;margin-bottom:1em;margin-left:1em;'>Download Zoho XLSX</button></a>"
 
-    # Update stock DataFrames
     for sku in nisbets_shipped:
         if sku in nisbets_stock['Offer SKU'].values:
             idx = nisbets_stock[nisbets_stock['Offer SKU'] == sku].index[0]
@@ -310,7 +310,6 @@ async def upload_orders_display(file: UploadFile = File(...)):
             return HTMLResponse("<b>Stock file update failed: File is open or locked in Excel.<br>Please close the file everywhere and try again in a minute.</b>", status_code=423)
         return HTMLResponse(f"<b>Stock file update failed:</b> {e}", status_code=500)
 
-    # ----------------- DPD LABEL CSV GENERATION --------------------
     try:
         dpd_template_df, dpd_col_headers, dpd_delim = get_dpd_template_columns(DPD_TEMPLATE_PATH)
         dpd_mandatory_row = list(dpd_template_df.iloc[2])
@@ -379,16 +378,16 @@ async def upload_orders_display(file: UploadFile = File(...)):
         5:  lambda row: row.get('Shipping address city', ''),
         6:  lambda row: row.get('Shipping address state', ''),
         7:  lambda row: row.get('Shipping address zip', ''),
-        8:  lambda row: '372',       # Always
+        8:  lambda row: '372',
         9:  lambda row: str(row.get('dpd_parcel_count', 1)),
-        10: lambda row: '10',        # Always
-        11: lambda row: 'N',         # Always
-        12: lambda row: 'O',         # Always
+        10: lambda row: '10',
+        11: lambda row: 'N',
+        12: lambda row: 'O',
         23: lambda row: row.get('Shipping address first name', ''),
         24: lambda row: row.get('Shipping address phone', ''),
-        28: lambda row: '8130L3',    # Always
-        30: lambda row: 'N',         # Always
-        31: lambda row: 'N',         # Always
+        28: lambda row: '8130L3',
+        30: lambda row: 'N',
+        31: lambda row: 'N',
     }
     required_fields = [
         (0, 'Order number'),
@@ -496,6 +495,5 @@ async def download_dpd_csv():
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=DPD_Export.csv"}
     )
-from fastapi.staticfiles import StaticFiles
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
