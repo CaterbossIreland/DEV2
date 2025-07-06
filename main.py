@@ -17,6 +17,9 @@ ZOHO_TEMPLATE_PATH = "column format.xlsx"
 DPD_TEMPLATE_PATH = "DPD.Import(1).csv"   # Use the correct file!
 
 app = FastAPI()
+from starlette.middleware.sessions import SessionMiddleware
+app.add_middleware(SessionMiddleware, secret_key="!supersecret!")  # Put any secret key here
+
 latest_nisbets_csv = None
 latest_zoho_xlsx = None
 latest_dpd_csv = None
