@@ -89,42 +89,42 @@ def get_dpd_template_columns(template_path):
 
 @app.get("/", response_class=HTMLResponse)
 async def main_upload_form(request: Request):
-    if request.session.get("admin_logged_in"):
-        # --- Your existing upload form HTML goes here! ---
-        return """
-        <style>
-        body { font-family: 'Segoe UI',Arial,sans-serif; background: #f3f6f9; margin: 0; padding: 0;}
-        .container { max-width: 720px; margin: 3em auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #0001; padding: 2.5em;}
-        h2 { margin-bottom: 0.5em; }
-        .upload-form { display: flex; flex-direction: column; gap: 1em;}
-        button { background: #3b82f6; color: #fff; border: none; border-radius: 6px; font-size: 1.1em; padding: 0.7em 2em; cursor: pointer;}
-        button:hover { background: #2563eb; }
-        .footer { margin-top: 2em; text-align: center; color: #888;}
-        </style>
-        <div class="container">
-          <form action="/logout" method="post" style="text-align:right;">
-            <button type="submit" style="background:#e53e3e;">Logout</button>
-          </form>
-          <h2>Upload Orders File</h2>
-          <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
-            <input name="file" type="file" accept=".xlsx" required>
-            <button type="submit">Upload & Show Output</button>
-          </form>
-          <div id="results"></div>
-        </div>
-        <div class="footer">Caterboss Orders &copy; 2025</div>
-        <script>
-        document.getElementById('uploadForm').onsubmit = async function(e){
-          e.preventDefault();
-          let formData = new FormData(this);
-          document.getElementById('results').innerHTML = "<em>Processing...</em>";
-          let res = await fetch('/upload_orders/display', { method: 'POST', body: formData });
-          let html = await res.text();
-          document.getElementById('results').innerHTML = html;
-          window.scrollTo(0,document.body.scrollHeight);
-        }
-        </script>
-        """
+    return """
+    <style>
+    body { font-family: 'Segoe UI',Arial,sans-serif; background: #f3f6f9; margin: 0; padding: 0;}
+    .container { max-width: 720px; margin: 3em auto; background: #fff; border-radius: 14px; box-shadow: 0 2px 16px #0001; padding: 2.5em;}
+    h2 { margin-bottom: 0.5em; }
+    .upload-form { display: flex; flex-direction: column; gap: 1em;}
+    button { background: #3b82f6; color: #fff; border: none; border-radius: 6px; font-size: 1.1em; padding: 0.7em 2em; cursor: pointer;}
+    button:hover { background: #2563eb; }
+    .footer { margin-top: 2em; text-align: center; color: #888;}
+    .admin-link { position: absolute; right: 40px; top: 22px;}
+    </style>
+    <div class="admin-link">
+      <a href="/admin-login"><button>Admin Login</button></a>
+    </div>
+    <div class="container">
+      <h2>Upload Orders File</h2>
+      <form class="upload-form" id="uploadForm" enctype="multipart/form-data">
+        <input name="file" type="file" accept=".xlsx" required>
+        <button type="submit">Upload & Show Output</button>
+      </form>
+      <div id="results"></div>
+    </div>
+    <div class="footer">Caterboss Orders &copy; 2025</div>
+    <script>
+    document.getElementById('uploadForm').onsubmit = async function(e){
+      e.preventDefault();
+      let formData = new FormData(this);
+      document.getElementById('results').innerHTML = "<em>Processing...</em>";
+      let res = await fetch('/upload_orders/display', { method: 'POST', body: formData });
+      let html = await res.text();
+      document.getElementById('results').innerHTML = html;
+      window.scrollTo(0,document.body.scrollHeight);
+    }
+    </script>
+    """
+
     else:
         # Show login form
         return """
